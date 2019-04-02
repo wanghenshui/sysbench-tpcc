@@ -21,7 +21,7 @@
 
 require("tpcc_common")
 
-
+-- mongo? need reimpl with mongo js
 function check_tables(drv, con, warehouse_num)
 
     straight_join_hint=","
@@ -34,8 +34,11 @@ function check_tables(drv, con, warehouse_num)
     local pass1 = 1
     for table_num = 1, sysbench.opt.tables do 
         -- print(string.format("Checking  tables: %d for warehouse: %d\n", table_num, warehouse_num))
-        rs  = con:query("SELECT d_w_id,sum(d_ytd)-max(w_ytd) diff FROM district"..table_num..",warehouse"..table_num.." WHERE d_w_id=w_id AND w_id="..warehouse_num.." group by d_w_id") 
-        
+        if (drv:name() ~= "mongodb") then
+		rs  = con:query("SELECT d_w_id,sum(d_ytd)-max(w_ytd) diff FROM district"..table_num..",warehouse"..table_num.." WHERE d_w_id=w_id AND w_id="..warehouse_num.." group by d_w_id") 
+        else 
+
+		end
         for i = 1, rs.nrows do
             row = rs:fetch_row()
             local d_tax = tonumber(row[2])

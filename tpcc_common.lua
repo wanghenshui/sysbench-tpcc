@@ -69,6 +69,7 @@ end
 
 -- Create the tables and Prepare the dataset. This command supports parallel execution, i.e. will
 -- benefit from executing with --threads > 1 as long as --scale > 1
+-- mongo?
 function cmd_prepare()
    local drv = sysbench.sql.driver()
    local con = drv:connect()
@@ -134,7 +135,7 @@ function create_tables(drv, con, table_num)
    end
 
    print(string.format("Creating tables: %d\n", table_num))
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	CREATE TABLE IF NOT EXISTS warehouse%d (
 	w_id smallint not null,
@@ -149,9 +150,14 @@ function create_tables(drv, con, table_num)
 	primary key (w_id) 
 	) %s %s]],
         table_num, engine_def, extra_table_options)
+   else
+   query = string.format([[
+	db.createCollection(warehouse%d )]],
+        table_num)
 
+   end
    con:query(query)
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS district%d (
 	d_id ]] .. tinyint_type .. [[ not null, 
@@ -168,11 +174,15 @@ function create_tables(drv, con, table_num)
 	primary key (d_w_id, d_id) 
 	) %s %s]],
       table_num, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(district%d )]],
+        table_num)
+   end
     con:query(query)
 
 -- CUSTOMER TABLE
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS customer%d (
 	c_id int not null, 
@@ -199,7 +209,11 @@ function create_tables(drv, con, table_num)
 	PRIMARY KEY(c_w_id, c_d_id, c_id)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(customer%d )]],
+        table_num)
+   end
    con:query(query)
 
 -- HISTORY TABLE
@@ -209,6 +223,7 @@ function create_tables(drv, con, table_num)
       hist_auto_inc="id int NOT NULL AUTO_INCREMENT,"
       hist_pk=",PRIMARY KEY(id)"
    end
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS history%d (
         %s
@@ -222,9 +237,13 @@ function create_tables(drv, con, table_num)
 	h_data varchar(24) %s
 	) %s %s]],
       table_num, hist_auto_inc, hist_pk, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(history%d )]],
+        table_num)
+   end
    con:query(query)
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS orders%d (
 	o_id int not null, 
@@ -238,11 +257,15 @@ function create_tables(drv, con, table_num)
 	PRIMARY KEY(o_w_id, o_d_id, o_id) 
 	) %s %s]],
       table_num, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(orders%d )]],
+        table_num)
+   end
    con:query(query)
 
 -- NEW_ORDER table
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS new_orders%d (
 	no_o_id int not null,
@@ -251,9 +274,13 @@ function create_tables(drv, con, table_num)
 	PRIMARY KEY(no_w_id, no_d_id, no_o_id)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(new_orders%d)]],
+        table_num)
+   end
    con:query(query)
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS order_line%d ( 
 	ol_o_id int not null, 
@@ -269,11 +296,15 @@ function create_tables(drv, con, table_num)
 	PRIMARY KEY(ol_w_id, ol_d_id, ol_o_id, ol_number)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(order_line%d)]],
+        table_num)
+   end
    con:query(query)
 
 -- STOCK table
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS stock%d (
 	s_i_id int not null, 
@@ -296,11 +327,15 @@ function create_tables(drv, con, table_num)
 	PRIMARY KEY(s_w_id, s_i_id)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(stock%d)]],
+        table_num)
+   end
    con:query(query)
 
    local i = table_num
-
+   if (drv:name() ~= "mongodb") then
    query = string.format([[
 	create table IF NOT EXISTS item%d (
 	i_id int not null, 
@@ -311,9 +346,13 @@ function create_tables(drv, con, table_num)
 	PRIMARY KEY(i_id) 
 	) %s %s]],
       i, engine_def, extra_table_options)
-
+   else
+   query = string.format([[
+	db.createCollection(item%d)]],
+        table_num)
+   end
    con:query(query)
-
+   if (drv:name() ~= "mongodb") then
    con:bulk_insert_init("INSERT INTO item" .. i .." (i_id, i_im_id, i_name, i_price, i_data) values")
    for j = 1 , MAXITEMS do
       local i_im_id = sysbench.rand.uniform(1,10000)
@@ -327,8 +366,22 @@ function create_tables(drv, con, table_num)
       con:bulk_insert_next(query)
 		 
    end
-   con:bulk_insert_done()
 
+   else
+   con:bulk_insert_init("db.item%d.insert({i_id:%d, i_im_id:%d, i_name:'%s', i_price:%f, i_data:'%s'})")
+   for j = 1 , MAXITEMS do
+      local i_im_id = sysbench.rand.uniform(1,10000)
+      local i_price = sysbench.rand.uniform_double()*100+1
+      -- i_name is not generated as prescribed by standard, but we want to provide a better compression
+      local i_name  = string.format("item-%d-%f-%s", i_im_id, i_price, sysbench.rand.string("@@@@@"))
+      local i_data  = string.format("data-%s-%s", i_name, sysbench.rand.string("@@@@@"))
+ 
+      query = string.format([[(%d,%d,'%s',%f,'%s')]],
+	j, i_im_id, i_name:sub(1,24), i_price, i_data:sub(1,50))
+      con:bulk_insert_next(query)
+   end
+   con:bulk_insert_done()
+   -- FIXME
     print(string.format("Adding indexes %d ... \n", i))
     con:query("CREATE INDEX idx_customer"..i.." ON customer"..i.." (c_w_id,c_d_id,c_last,c_first)")
     con:query("CREATE INDEX idx_orders"..i.." ON orders"..i.." (o_w_id,o_d_id,o_c_id,o_id)")
@@ -382,8 +435,19 @@ function set_isolation_level(drv,con)
         con:query("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL " .. isolation_level )
    end
 
+   if drv:name() == "mongodb"
+   then
+        if sysbench.opt.trx_level == "RR" then
+            isolation_level="REPEATABLE READ"
+        elseif sysbench.opt.trx_level == "RC" then
+            isolation_level="READ COMMITTED"
+        elseif sysbench.opt.trx_level == "SER" then
+            isolation_level="SERIALIZABLE"
+        end
+        -- FIXME: how?
+        --con:query("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL " .. isolation_level )
+   end
 end
-
 
 
 function load_tables(drv, con, warehouse_num)
@@ -397,7 +461,7 @@ function load_tables(drv, con, warehouse_num)
    -- print(string.format("Creating warehouse: %d\n", warehouse_num))
 
    for table_num = 1, sysbench.opt.tables do 
-
+   if (drv:name() ~= "mongodb") then
    print(string.format("loading tables: %d for warehouse: %d\n", table_num, warehouse_num))
 
     con:bulk_insert_init("INSERT INTO warehouse" .. table_num .. 
@@ -413,7 +477,24 @@ function load_tables(drv, con, warehouse_num)
 
     con:bulk_insert_init("INSERT INTO district" .. table_num .. 
 	" (d_id, d_w_id, d_name, d_street_1, d_street_2, d_city, d_state, d_zip, d_tax, d_ytd, d_next_o_id) values")
+   else
+    print(string.format("loading tables: %d for warehouse: %d\n", table_num, warehouse_num))
 
+    con:bulk_insert_init([["db.warehouse%d.insert({w_id:%d, w_name:'%s', w_street_1:'%s', w_street_2:'%s', w_city:'%s',\
+	w_state:'%s', w_zip:'%s', w_tax:%f, w_ytd:300000}) "]]
+	 :format(table_num ,w_id, w_name, w_street_1, w_street_2, w_city, w_state, w_zip, w_tax, w_ytd) )
+
+    query = string.format([[(%d, '%s','%s','%s', '%s', '%s', '%s', %f,300000)]],
+	warehouse_num, sysbench.rand.string("name-@@@@@"), sysbench.rand.string("street1-@@@@@@@@@@"),
+        sysbench.rand.string("street2-@@@@@@@@@@"), sysbench.rand.string("city-@@@@@@@@@@"),
+        sysbench.rand.string("@@"),sysbench.rand.string("zip-#####"),sysbench.rand.uniform_double()*0.2 )
+      con:bulk_insert_next(query)
+		 
+    con:bulk_insert_done()
+
+    con:bulk_insert_init("INSERT INTO district" .. table_num .. 
+	" (d_id, d_w_id, d_name, d_street_1, d_street_2, d_city, d_state, d_zip, d_tax, d_ytd, d_next_o_id) values")
+   end
    for d_id = 1 , DIST_PER_WARE do
  
       query = string.format([[(%d, %d, '%s','%s','%s', '%s', '%s', '%s', %f,30000,3001)]],
@@ -573,14 +654,14 @@ end
 function thread_init()
    drv = sysbench.sql.driver()
    con = drv:connect()
-   con:query("SET AUTOCOMMIT=0")
+   con:query("SET AUTOCOMMIT=0")-- mongo?
 
 end
 
 function thread_done()
    con:disconnect()
 end
-
+-- mongo?
 function cleanup()
    local drv = sysbench.sql.driver()
    local con = drv:connect()
