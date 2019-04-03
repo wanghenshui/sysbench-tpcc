@@ -69,7 +69,6 @@ end
 
 -- Create the tables and Prepare the dataset. This command supports parallel execution, i.e. will
 -- benefit from executing with --threads > 1 as long as --scale > 1
--- mongo?
 function cmd_prepare()
    local drv = sysbench.sql.driver()
    local con = drv:connect()
@@ -151,8 +150,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
         table_num, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(warehouse%d )]],
+   query = string.format([[{createCollection:warehouse%d }]],
         table_num)
 
    end
@@ -175,8 +173,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(district%d )]],
+   query = string.format([[{createCollection:district%d }]],
         table_num)
    end
     con:query(query)
@@ -210,8 +207,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(customer%d )]],
+   query = string.format([[{createCollection:customer%d }]],
         table_num)
    end
    con:query(query)
@@ -238,9 +234,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, hist_auto_inc, hist_pk, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(history%d )]],
-        table_num)
+   query = string.format([[{createCollection:history%d }]],   table_num)
    end
    con:query(query)
    if (drv:name() ~= "mongodb") then
@@ -258,8 +252,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(orders%d )]],
+   query = string.format([[{createCollection:orders%d }]],
         table_num)
    end
    con:query(query)
@@ -275,8 +268,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(new_orders%d)]],
+   query = string.format([[{createCollection:new_orders%d }]],
         table_num)
    end
    con:query(query)
@@ -297,8 +289,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(order_line%d)]],
+   query = string.format([[{createCollection:order_line%d }]],
         table_num)
    end
    con:query(query)
@@ -328,8 +319,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(stock%d)]],
+   query = string.format([[{createCollection:stock%d }]],
         table_num)
    end
    con:query(query)
@@ -347,8 +337,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       i, engine_def, extra_table_options)
    else
-   query = string.format([[
-	db.createCollection(item%d)]],
+   query = string.format([[{createCollection:item%d }]],
         table_num)
    end
    con:query(query)
@@ -368,7 +357,8 @@ function create_tables(drv, con, table_num)
    end
 
    else
-   con:bulk_insert_init("db.item%d.insert({i_id:%d, i_im_id:%d, i_name:'%s', i_price:%f, i_data:'%s'})")
+   --FIXME replace "" with [[]]?
+   con:bulk_insert_init("{insert:item%d,documents:[{i_id:%d, i_im_id:%d, i_name:'%s', i_price:%f, i_data:'%s'} ]}")
    for j = 1 , MAXITEMS do
       local i_im_id = sysbench.rand.uniform(1,10000)
       local i_price = sysbench.rand.uniform_double()*100+1
@@ -380,6 +370,8 @@ function create_tables(drv, con, table_num)
 	j, i_im_id, i_name:sub(1,24), i_price, i_data:sub(1,50))
       con:bulk_insert_next(query)
    end
+   end
+
    con:bulk_insert_done()
    -- FIXME
     print(string.format("Adding indexes %d ... \n", i))
@@ -480,8 +472,8 @@ function load_tables(drv, con, warehouse_num)
    else
     print(string.format("loading tables: %d for warehouse: %d\n", table_num, warehouse_num))
 
-    con:bulk_insert_init([["db.warehouse%d.insert({w_id:%d, w_name:'%s', w_street_1:'%s', w_street_2:'%s', w_city:'%s',\
-	w_state:'%s', w_zip:'%s', w_tax:%f, w_ytd:300000}) "]]
+    con:bulk_insert_init([[{insert:warehouse%d,documents:[{w_id:%d, w_name:'%s', w_street_1:'%s', w_street_2:'%s', w_city:'%s',\
+	w_state:'%s', w_zip:'%s', w_tax:%f, w_ytd:300000}) }]}]]
 	 :format(table_num ,w_id, w_name, w_street_1, w_street_2, w_city, w_state, w_zip, w_tax, w_ytd) )
 
     query = string.format([[(%d, '%s','%s','%s', '%s', '%s', '%s', %f,300000)]],

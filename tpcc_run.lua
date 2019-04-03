@@ -34,7 +34,7 @@ function other_ware (home_ware)
     until tmp == home_ware
     return tmp
 end
--- mongo?
+
 function new_order()
 
 -- prep work
@@ -95,7 +95,7 @@ function new_order()
                                                          format(table_num, table_num, w_id, d_id, c_id))
   else
   -- mongo£¿¶à±í²éÑ¯
-	c_discount, c_last, c_credit, w_tax = con:query_row(([[db.customer%d.find]]):format(table_num, table_num, w_id, d_id, c_id)
+--	c_discount, c_last, c_credit, w_tax = con:query_row(([[db.customer%d.find]]):format(table_num, table_num, w_id, d_id, c_id)
   ))
 
   end
@@ -114,7 +114,7 @@ function new_order()
                                            AND d_id = %d FOR UPDATE]]):
                                         format(table_num, w_id, d_id))
   else
-    d_next_o_id, d_tax = con:query_row(([[db.district%d.find({d_w_id:%d,d_id:%d,upsert:true},{d_next_o_id:1,d_tax:1} )]]):
+    d_next_o_id, d_tax = con:query_row(([[{find:district%d,filter:{d_w_id:%d,d_id:%d,upsert:true},projection:{d_next_o_id:1,d_tax:1}]]):
                                         format(table_num, w_id, d_id))
   end
 
@@ -127,7 +127,11 @@ function new_order()
                   SET d_next_o_id = %d
                 WHERE d_id = %d AND d_w_id= %d]]):format(table_num, d_next_o_id + 1, d_id, w_id))
   else
-        con:query(([[db.district%d.updateMany({d_id:%d,d_w_id:%d},{$set:{d_next_o_id:%d}})]]):format(table_num, d_id, w_id, d_next_o_id + 1))
+        con:query(([[{update:district%d,
+						updates:[{
+						q:{d_id:%d,d_w_id:%d},u:{$set:{d_next_o_id:%d}}
+						}]
+						}]]):format(table_num, d_id, w_id, d_next_o_id + 1))
   end
 --INSERT INTO orders (o_id, o_d_id, o_w_id, o_c_id,
 --                                    o_entry_d, o_ol_cnt, o_all_local)
@@ -141,7 +145,7 @@ function new_order()
                     VALUES (%d,%d,%d,%d,NOW(),%d,%d)]]):
                     format(table_num, d_next_o_id, d_id, w_id, c_id, ol_cnt, all_local))
   else
-     con:query(([[db.orders%d.insertOne({o_id:%d,o_d_id:%d,o_w_id:%d,o_c_id:%d,o_entry_d:%d,o_ol_cnt:%d,o_all_local:%d})]]):
+     con:query(([[{insert:orders%d,documents:[{o_id:%d,o_d_id:%d,o_w_id:%d,o_c_id:%d,o_entry_d:%d,o_ol_cnt:%d,o_all_local:%d}]}]]):
                     format(table_num, d_next_o_id, d_id, w_id, c_id, ol_cnt, all_local))
   end
 -- INSERT INTO new_orders (no_o_id, no_d_id, no_w_id)
@@ -152,7 +156,7 @@ function new_order()
                     VALUES (%d,%d,%d)]]):
                    format(table_num, d_next_o_id, d_id, w_id))
   else
-     con:query(([[db.new_orders%d.insertOne({no_o_id:%d, no_d_id:%d, no_w_id:%d})]]):
+     con:query(([[{insert:new_orders%d,documents:[{no_o_id:%d, no_d_id:%d, no_w_id:%d}]}]]):
                    format(table_num, d_next_o_id, d_id, w_id))
   end
   for ol_number=1, ol_cnt do
@@ -171,7 +175,7 @@ function new_order()
 	                   WHERE i_id = %d]]):
 	                  format(table_num, ol_i_id))
     else
-      rs = con:query(([[db.item%d.find({i_id:%d},{ i_price:1, i_name:1, i_data:1 })]]):
+      rs = con:query(([[{find:new_orders%d,filter:{i_id:%d},projection:{ i_price:1, i_name:1, i_data:1 }}]]):
 	                  format(table_num, ol_i_id))
     end
 	local i_price
@@ -208,7 +212,9 @@ function new_order()
 	                                                     WHERE s_i_id = %d AND s_w_id= %d FOR UPDATE]]):
 	                                                     format(string.format("%02d",d_id),table_num,ol_i_id,ol_supply_w_id ))
     else
-		s_quantity, s_data, ol_dist_info = con:query_row(([[db.stock%d.findAndModify({ s_i_id:%d,s_w_id:%d},{s_quantity:1, s_data:1,s_dist_%s:1, s_dist:1}) ]] ):
+	--FIXME update what?
+	s_quantity, s_data, ol_dist_info = 
+	con:query_row(([[{findAndModify:stock%d,query:{ s_i_id:%d,s_w_id:%d},update:{s_quantity:1, s_data:1,s_dist_%s:1, s_dist:1},upsert:1} ]] ):
 	                                                     format(table_num,ol_i_id,ol_supply_w_id,string.format("%02d",d_id)))
 	end
         s_quantity=tonumber(s_quantity)
@@ -234,7 +240,7 @@ function new_order()
         d_tax=tonumber(d_tax)        
         c_discount=tonumber(c_discount)
     else
-	con:query(([[db.stock%d.update({$set,{s_quantity:%d}},{s_i_id:%d,a_w_id:%d})]]):
+	con:query(([[{update:stock%d,updates:[(u:{$set,{s_quantity:%d}},q:{s_i_id:%d,a_w_id:%d}]}]]):
 		    format(table_num, s_quantity, ol_i_id, ol_supply_w_id))
    
         i_price=tonumber(i_price)
@@ -258,8 +264,9 @@ function new_order()
 	                  VALUES (%d,%d,%d,%d,%d,%d,%d,%d,'%s')]]):
 	                  format(table_num, d_next_o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info))
     else
-	con:query(([[db.order_line%d.insertOne({ol_o_id:%d, ol_d_id:%d, ol_w_id:%d, ol_number:%d, ol_i_id:%d, ol_supply_w_id:%d, ol_quantity:%d, ol_amount:%d, ol_dist_info:'%s'})]]):
-	                  format(table_num, d_next_o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info))
+	con:query(([[{insert:order_line%d,documents:[
+			{ol_o_id:%d, ol_d_id:%d, ol_w_id:%d, ol_number:%d, ol_i_id:%d, ol_supply_w_id:%d, ol_quantity:%d, ol_amount:%d, ol_dist_info:'%s'}]}
+			]]):format(table_num, d_next_o_id, d_id, w_id, ol_number, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, ol_dist_info))
     end
   end
 
@@ -304,7 +311,7 @@ function payment()
 	          SET w_ytd = w_ytd + %d 
 	        WHERE w_id = %d]]):format(table_num, h_amount, w_id ))
   else
-    con:query(([[db.warehouse%d.update({$set:{w_ytd:$w_ytd+%d},{w_id:%d}})]]):format(table_num, h_amount, w_id ))
+    con:query(([[{update:warehose%d,updates:[u:{$set:{w_ytd:$w_ytd+%d},q:{w_id:%d}]}]]):format(table_num, h_amount, w_id ))
   end
 
 
@@ -337,8 +344,9 @@ function payment()
                  AND d_id= %d]]):format(table_num, h_amount, w_id, d_id))
 
   else
-    con:query(([[db.district%d.updateMany({$set:{d_ytd:$d_ytd+%d},
-				{d_w_id:%d,d_id:%d}})]]):format(table_num, h_amount, w_id, d_id))
+  -- FIXME u q order?
+    con:query(([[{update:district%d,updates:[u:{$set:{d_ytd:$d_ytd+%d},q:
+				{d_w_id:%d,d_id:%d}}]}]]):format(table_num, h_amount, w_id, d_id))
   end
   local d_street_1,d_street_2, d_city, d_state, d_zip, d_name
 
@@ -351,8 +359,8 @@ function payment()
                                               AND d_id = %d]]):format(table_num, w_id, d_id ))
   else 
   d_street_1,d_street_2, d_city, d_state, d_zip, d_name = 
-                          con:query_row(([[db.district%d.find({d_w_id:%d,d_id:%d},
-						  {d_street_1:1, d_street_2:1, d_city:1, d_state:1, d_zip, d_name:1 })]]):format(table_num, w_id, d_id ))
+                          con:query_row(([[{find:district%d,filter:{d_w_id:%d,d_id:%d},projection:
+						  {d_street_1:1, d_street_2:1, d_city:1, d_state:1, d_zip, d_name:1 }}]]):format(table_num, w_id, d_id ))
   end
   if byname == 1 then
 
@@ -369,7 +377,10 @@ function payment()
 			                    AND c_d_id= %d
                                             AND c_last='%s']]):format(table_num, w_id, c_d_id, c_last ))
   else
-    local namecnt = con:query_row(([[db.customer%d.find({c_id:{$exists:true},{c_w_id:%d,c_d_id:%d,c_last:'%s'}}).count()]]):format(table_num, w_id, c_d_id, c_last ))
+  -- FIXME c_id?
+    local namecnt = con:query_row(([[
+	{count:customer%d%d,query:{d_w_id:%d,d_id:%d}}
+	]]):format(table_num, w_id, c_d_id, c_last ))
   end
 --		SELECT c_id
 --		FROM customer
@@ -389,7 +400,7 @@ function payment()
                              AND c_last='%s' ORDER BY c_first]]
 			):format(table_num, w_id, c_d_id, c_last ))
   else
-  	rs = con:query(([[db.customer%d.find({c_w_id:%d,c_d_id:%d},{c_id:1})]]
+  	rs = con:query(([[{find:customer%d,filter:{c_w_id:%d,c_d_id:%d},projection:{c_id:1},sort:{c_first:1}}]]
 			):format(table_num, w_id, c_d_id, c_last ))
   end
 	for i = 1,  (namecnt / 2 ) + 1 do
@@ -425,10 +436,11 @@ function payment()
   else
    c_first, c_middle, c_last, c_street_1, c_street_2, c_city, c_state, c_zip,
    c_phone, c_credit, c_credit_lim, c_discount, c_balance, c_ytd_payment, c_since =
-	 con:query_row(([[db.customer%d.find({c_w_id:%d,c_d_id:%d,c_id:%d},{c_first:1, c_middle:1, c_last:1, c_street_1:1,
+	 con:query_row(([[{find:customer%d,filter:{c_w_id:%d,c_d_id:%d,c_id:%d},projection:
+						  {c_first:1, c_middle:1, c_last:1, c_street_1:1,
                                  c_street_2:1, c_city:1, c_state:1, c_zip:1, c_phone:1,
-                                 c_credit:1, c_credit_lim:1, c_discount:1, c_balance:1, c_ytd_payment:1, c_since:1}) ]])
-			 :format(table_num, w_id, c_d_id, c_id ))
+                                 c_credit:1, c_credit_lim:1, c_discount:1, c_balance:1, c_ytd_payment:1, c_since:1}}
+					]]) :format(table_num, w_id, c_d_id, c_id ))
   end
   c_balance = tonumber(c_balance) - h_amount
   c_ytd_payment = tonumber(c_ytd_payment) + h_amount
@@ -451,8 +463,8 @@ function payment()
                                      AND c_id= %d]]):
                                   format(table_num, w_id, c_d_id, c_id ))
     else 
-	  c_data = con:query_row(([[db.customer%d.find({c_w_id:%d,c_d_id:%d,c_id:%d},{c_data:1}) ]]):
-                                  format(table_num, w_id, c_d_id, c_id ))
+	  c_data = con:query_row(([[{find:customer%d,filter:{c_w_id:%d,c_d_id:%d,c_id:%d},projection:{c_data:1}}
+							]]):format(table_num, w_id, c_d_id, c_id ))
     end
         local c_new_data=string.sub(string.format("| %4d %2d %4d %2d %4d $%7.2f %12s %24s",
                 c_id, c_d_id, c_w_id, d_id, w_id, h_amount, os.time(), c_data), 1, 500);
@@ -471,7 +483,7 @@ function payment()
                         AND c_id=%d]])
 		  :format(table_num, c_balance, c_ytd_payment, c_new_data, w_id, c_d_id, c_id  ))
     else 
-	  con:query(([[db.customer%d.updateMany({$set:{c:%f,c_ytd_payment:%f,c_data:'%s'}},{c_w_id:%d,c_d_id:%d,c_id:%d}) ]]):
+	  con:query(([[{update:customer%d,updates:[{u:{$set:{c:%f,c_ytd_payment:%f,c_data:'%s'}},q:{c_w_id:%d,c_d_id:%d,c_id:%d}}]} ]]):
                                   format(table_num,c_balance, c_ytd_payment, c_new_data, w_id, c_d_id, c_id ))
     end
   else
@@ -484,8 +496,8 @@ function payment()
                         AND c_id=%d]])
 		  :format(table_num, c_balance, c_ytd_payment, w_id, c_d_id, c_id  ))
     else
-	  con:query(([[db.customer%d.updateMany({$set:{c:%f,c_ytd_payment:%f}},{c_w_id:%d,c_d_id:%d,c_id:%d}) ]]):
-                                  format(table_num,c_balance, c_ytd_payment, w_id, c_d_id, c_id ))
+	  con:query(([[{update:customer%d,updates:[{u:{$set:{c:%f,c_ytd_payment:%f}},q:{c_w_id:%d,c_d_id:%d,c_id:%d}}]}
+					]]):format(table_num,c_balance, c_ytd_payment, w_id, c_d_id, c_id ))
 	end
   end
 
@@ -504,7 +516,7 @@ function payment()
 
   con:query("COMMIT")
   else
-  con:query(([[db.history%d.insertOne({h_c_d_id:%d, h_c_w_id:%d, h_c_id:%d, h_d_id:%d,  h_w_id:%d, h_date:NOW(), h_amount:%d, h_data:'%s'}) ]])
+  con:query(([[{insert:history%d,documents:[{h_c_d_id:%d, h_c_w_id:%d, h_c_id:%d, h_d_id:%d,  h_w_id:%d, h_date:NOW(), h_amount:%d, h_data:'%s'}]} ]])
             :format(table_num, c_d_id, c_w_id, c_id, d_id,  w_id, h_amount, string.format("%10s %10s    ",w_name,d_name)))
   end
 
@@ -547,8 +559,10 @@ function orderstatus()
                                       AND c_last='%s']]):
                                   format(table_num, w_id, d_id, c_last ))
     else
-	    namecnt = con:query_row(([[db.customer%d.find({c_w_id:%d,c_d_id:%d,c_last:'%s'},{c_id:1}).count()]]):
-    end                              format(table_num, w_id, d_id, c_last ))
+	-- FIXME c_id?
+	    namecnt = con:query_row(([[{count:customer%d,query:{c_w_id:%d,c_d_id:%d,c_last:'%s'}}
+		]]): format(table_num, w_id, d_id, c_last ))
+    end                             
     	
 --            SELECT c_balance, c_first, c_middle, c_id
 --            FROM customer
@@ -565,9 +579,10 @@ function orderstatus()
                              AND c_last='%s' ORDER BY c_first]])
 		:format(table_num, w_id, d_id, c_last ))
     else 
-	    rs = con:query(([[db.customer%d.find({c_w_id:%d,c_d_id:%d},
-		{c_balance:1, c_first:1, c_middle:1, c_id:1}).sort({c_first:1})]])
-		:format(table_num, w_id, d_id, c_last ))
+	-- FIXME{c_balance:1, c_first:1, c_middle:1, c_id:1}).sort({c_first:1})
+	    rs = con:query(([[
+		{count:customer%d,query:{c_w_id:%d,c_d_id:%d}}			
+		]]):format(table_num, w_id, d_id, c_last ))
 	end
         if namecnt % 2 == 0 then
             namecnt = namecnt + 1
@@ -596,8 +611,8 @@ function orderstatus()
                                   :format(table_num, w_id, d_id, c_id ))
 	  else 
 	          c_balance, c_first, c_middle, c_last = 
-                   con:query_row(([[db.customer%d.find({c_w_id:%d,c_d_id:%d},{c_balance:1, c_first:1, c_middle:1, c_last:1})]])
-                                  :format(table_num, w_id, d_id, c_id ))
+                   con:query_row(([[{find:customer%d,filter:{c_w_id:%d,c_d_id:%d},projection:{c_balance:1, c_first:1, c_middle:1, c_last:1}}
+									]]):format(table_num, w_id, d_id, c_id ))
 	  end
     end
 --[=[ Initial query
@@ -629,9 +644,9 @@ function orderstatus()
                                   ORDER BY o_id DESC]]):
                              format(table_num, w_id, d_id, c_id))
 	  else
-	        o_id = con:query_row(([[db.orders%d.find({o_w_id:%d,o_d_id:%d,o_c_id:%d},
-			{o_id:1, o_carrier_id:1, o_entry_d:1}).sort({o_id:-1})]]):
-                             format(table_num, w_id, d_id, c_id))
+	        o_id = con:query_row(([[
+			{find:customer%d,filter:{o_w_id:%d,o_d_id:%d,o_c_id:%d},projection:{o_id:1, o_carrier_id:1, o_entry_d:1},sort:{o_id:-1}}
+									]]):format(table_num, w_id, d_id, c_id))
 	  end
 --      rs = con:query(([[SELECT o_id, o_carrier_id, o_entry_d
 --                                FROM orders%d 
@@ -660,9 +675,9 @@ function orderstatus()
             FROM order_line%d WHERE ol_w_id = %d AND ol_d_id = %d  AND ol_o_id = %d]])
                   :format(table_num, w_id, d_id, d_id, o_id))
 	else
-	    rs = con:query(([[db.order_line%d.find({ol_w_id:%d,ol_d_id:%d,ol_o_id:%d},
-		{ ol_i_id:1, ol_supply_w_id:, ol_quantity:, ol_amount:, ol_delivery_d:})]])
-                  :format(table_num, w_id, d_id, d_id, o_id))
+	    rs = con:query(([[
+		{find:order_line%d,filter:{ol_w_id:%d,ol_d_id:%d,ol_o_id:%d},projection:{ ol_i_id:1, ol_supply_w_id:1, ol_quantity:1, ol_amount:1, ol_delivery_d:1}}
+			]]):format(table_num, w_id, d_id, d_id, o_id))
 	end
     for i = 1,  rs.nrows do
         row = rs:fetch_row()
@@ -702,8 +717,9 @@ function delivery()
                                       ORDER BY no_o_id ASC LIMIT 1 FOR UPDATE]])
                                    :format(table_num, d_id, w_id))
 	else
-	   rs = con:query(([[db.new_orders%d.findAndModify({no_d_id:%d,no_w_id:%d},{no_o_id:1}).sort({no_o_id:1}).limit(1)]])
-                                   :format(table_num, d_id, w_id))
+	   rs = con:query(([[
+	   {find:new_orders%d,filter:{no_d_id:%d,no_w_id:%d},projection:{no_o_id:1},sort:{no_o_id:1},limit:1}
+			]]):format(table_num, d_id, w_id))
 	end
         if (rs.nrows > 0) then
           no_o_id=unpack(rs:fetch_row(), 1, rs.nfields)
@@ -721,8 +737,8 @@ function delivery()
                              AND no_w_id = %d]])
                             :format(table_num, no_o_id, d_id, w_id))
     else
-	     con:query(([[db.new_orders%d.deleteMany({no_o_id:%d,no_d_id:%d,no_w_id:%d})]])
-                            :format(table_num, no_o_id, d_id, w_id))
+	     con:query(([[{delete:new_orders%d,deletes:[{q:{no_o_id:%d,no_d_id:%d,no_w_id:%d},limit:0}]}
+					]]):format(table_num, no_o_id, d_id, w_id))
 	end
 --  SELECT o_c_id INTO :c_id FROM orders
 --		                WHERE o_id = :no_o_id AND o_d_id = :d_id
@@ -738,8 +754,8 @@ function delivery()
                                      AND o_w_id = %d]])
                                   :format(table_num, no_o_id, d_id, w_id))
     else
-	    o_c_id = con:query_row(([[db.orders%d.find({o_id:%d,o_d_id:%d,o_w_id:%d},{o_c_id:1})]])
-                                  :format(table_num, no_o_id, d_id, w_id))
+	    o_c_id = con:query_row(([[{find:orders%d,filter:{o_id:%d,o_d_id:%d,o_w_id:%d},projection:{o_c_id:1}}
+							]]):format(table_num, no_o_id, d_id, w_id))
 	end
 --	 UPDATE orders SET o_carrier_id = :o_carrier_id
 --		                WHERE o_id = :no_o_id AND o_d_id = :d_id AND
@@ -753,8 +769,8 @@ function delivery()
                         AND o_w_id = %d]])
                       :format(table_num, o_carrier_id, no_o_id, d_id, w_id))
     else
-	    con:query(([[db.orders%d.updateMany({$set:{o_carrier_id:%d},
-		{o_id:%d,o_d_id:%d,o_w_id:%d}})]])
+	    con:query(([[{update:orders%d,updates:[u:{$set:{o_carrier_id:%d},q:
+		{o_id:%d,o_d_id:%d,o_w_id:%d}]}]])
                       :format(table_num, o_carrier_id, no_o_id, d_id, w_id))
 	end
 --   UPDATE order_line
@@ -770,9 +786,9 @@ function delivery()
                         AND ol_w_id = %d]])
                       :format(table_num, no_o_id, d_id, w_id))
     else
-	  con:query(([[db.order_line%d.updateMany({$set:{ol_delivery_d:NOW()}},
-					{ol_o_id:%d,ol_d_id:%d,ol_w_id:%d})]])
-                      :format(table_num, no_o_id, d_id, w_id))
+	  con:query(([[{
+		update:orders%d,updates:[u:{$set:{ol_delivery_d:NOW()},q:{ol_o_id:%d,ol_d_id:%d,ol_w_id:%d}]}
+				]]):format(table_num, no_o_id, d_id, w_id))
 	end
 --	 SELECT SUM(ol_amount) INTO :ol_total
 --		                FROM order_line
@@ -812,9 +828,9 @@ function delivery()
                         AND c_w_id = %d]])
                       :format(table_num, sm_ol_amount, o_c_id, d_id, w_id))
      else 
-	 con:query(([[db.customer%d.updateMany({$set:{c_balance:$c_balance+%f,c_delivery_cnt:$c_delivery_cnt+1}},
-	 {c_id:%d,c_d_id:%d,c_w_id:%d})]])
-                      :format(table_num, sm_ol_amount, o_c_id, d_id, w_id))
+	 con:query(([[{
+	 update:orders%d,updates:[u:{$set:{c_balance:$c_balance+%f,c_delivery_cnt:$c_delivery_cnt+1},q:{c_id:%d,c_d_id:%d,c_w_id:%d}]}
+				]]):format(table_num, sm_ol_amount, o_c_id, d_id, w_id))
 	 end
 		
 	end
@@ -851,8 +867,8 @@ function stocklevel()
              	                    WHERE d_id = %d AND d_w_id= %d]])
 		                  :format( table_num, d_id, w_id))
     else
-	 d_next_o_id = con:query_row(([[db.district%d.find({d_id:%d,w_id:%d},{d_next_o_id:1})]])
-		                  :format( table_num, d_id, w_id))
+	 d_next_o_id = con:query_row(([[{find:district%d,filter:{d_id:%d,w_id:%d},projection:{d_next_o_id:1}}
+									]]):format( table_num, d_id, w_id))
 	end
     if stock_level_queries == "case1" then 
 
@@ -893,8 +909,8 @@ function stocklevel()
                  AND ol_o_id < %d AND ol_o_id >= %d]])
                 :format(table_num, w_id, d_id, d_next_o_id, d_next_o_id - 20 ))
 	else
-	rs = con:query(([[db.order_line%d.aggregate({$match:{$and:{ol_w_id:%d,ol_d_id:%d,ol_o_id:{$lt:%d},ol_o_id:{$gte:%d}}}},
-				[ { $group : { _id : "ol_i_id" } } ] )]])
+	rs = con:query(([[{aggregate:order_line%d,[$match:{$and:{ol_w_id:%d,ol_d_id:%d,ol_o_id:{$lt:%d},ol_o_id:{$gte:%d}}],
+				[ { $group : { _id : "ol_i_id" } } ] }]])
                 :format(table_num, w_id, d_id, d_next_o_id, d_next_o_id - 20 ))
 	end
     local ol_i_id = {}
@@ -917,8 +933,8 @@ function stocklevel()
                    AND s_quantity < %d]])
                 :format(table_num, w_id, ol_i_id[i], level ) )
     else 
-		rs = con:query(([[db.stock%d.find({s_w_id:%d,s_i_id:%d,s_quantity:{$lt:%d}}).count()]])
-                :format(table_num, w_id, ol_i_id[i], level ) )
+		rs = con:query(([[{count:stock%d,query:{s_w_id:%d,s_i_id:%d,s_quantity:{$lt:%d}}}
+		]]):format(table_num, w_id, ol_i_id[i], level ) )
 	end
 		local cnt
         for i = 1, rs.nrows do
