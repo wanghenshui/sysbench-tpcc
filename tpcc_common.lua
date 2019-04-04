@@ -150,8 +150,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
         table_num, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:warehouse%d }]],
-        table_num)
+   query = string.format("{\"create\":\"warehouse%d\"}",table_num)
 
    end
    con:query(query)
@@ -173,10 +172,10 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:district%d }]],
+   query = string.format("{\"create\":\"district%d\" }",
         table_num)
    end
-    con:query(query)
+   con:query(query)
 
 -- CUSTOMER TABLE
    if (drv:name() ~= "mongodb") then
@@ -207,7 +206,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:customer%d }]],
+   query = string.format("{\"create\":\"customer%d\" }" ,
         table_num)
    end
    con:query(query)
@@ -234,7 +233,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, hist_auto_inc, hist_pk, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:history%d }]],   table_num)
+   query = string.format("{\"create\":\"history%d\" }",table_num)
    end
    con:query(query)
    if (drv:name() ~= "mongodb") then
@@ -252,8 +251,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:orders%d }]],
-        table_num)
+   query = string.format("{\"create\":\"orders%d\" }",table_num)
    end
    con:query(query)
 
@@ -268,8 +266,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:new_orders%d }]],
-        table_num)
+   query = string.format("{\"create\":\"new_orders%d\" }",table_num)
    end
    con:query(query)
    if (drv:name() ~= "mongodb") then
@@ -289,8 +286,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:order_line%d }]],
-        table_num)
+   query = string.format("{\"create\":\"order_line%d\" }",table_num)
    end
    con:query(query)
 
@@ -319,8 +315,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       table_num, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:stock%d }]],
-        table_num)
+   query = string.format("{\"create\":\"stock%d\" }",table_num)
    end
    con:query(query)
 
@@ -337,8 +332,7 @@ function create_tables(drv, con, table_num)
 	) %s %s]],
       i, engine_def, extra_table_options)
    else
-   query = string.format([[{createCollection:item%d }]],
-        table_num)
+   query = string.format("{\"create\":\"item%d\" }",table_num)
    end
    con:query(query)
    if (drv:name() ~= "mongodb") then
@@ -352,28 +346,30 @@ function create_tables(drv, con, table_num)
  
       query = string.format([[(%d,%d,'%s',%f,'%s')]],
 	j, i_im_id, i_name:sub(1,24), i_price, i_data:sub(1,50))
-      con:bulk_insert_next(query)
-		 
+      con:bulk_insert_next(query)	 
    end
-
+   
    else
-   --FIXME replace "" with [[]]?
-   con:bulk_insert_init("{insert:item%d,documents:[{i_id:%d, i_im_id:%d, i_name:'%s', i_price:%f, i_data:'%s'} ]}")
+   --FIXME replace "" with [[]]? -can't 
+   --con:bulk_insert_init()
    for j = 1 , MAXITEMS do
       local i_im_id = sysbench.rand.uniform(1,10000)
       local i_price = sysbench.rand.uniform_double()*100+1
       -- i_name is not generated as prescribed by standard, but we want to provide a better compression
       local i_name  = string.format("item-%d-%f-%s", i_im_id, i_price, sysbench.rand.string("@@@@@"))
       local i_data  = string.format("data-%s-%s", i_name, sysbench.rand.string("@@@@@"))
- 
-      query = string.format([[(%d,%d,'%s',%f,'%s')]],
-	j, i_im_id, i_name:sub(1,24), i_price, i_data:sub(1,50))
-      con:bulk_insert_next(query)
+	  query = string.format("{\"insert\":\"item%d\",\"documents\" \
+	  :[{\"i_id\": %d,\"i_im_id\":%d, \"i_name\":\"'%s'\", \"i_price\":%f, \"i_data\":\"'%s'\"}]}",
+	  i,j, i_im_id, i_name:sub(1,24), i_price, i_data:sub(1,50))
+	  con:query(query)
+
+
+	  --con:bulk_insert_next(query)
    end
    end
 
    con:bulk_insert_done()
-   -- FIXME
+   if (drv:name() ~= "mongodb") then
     print(string.format("Adding indexes %d ... \n", i))
     con:query("CREATE INDEX idx_customer"..i.." ON customer"..i.." (c_w_id,c_d_id,c_last,c_first)")
     con:query("CREATE INDEX idx_orders"..i.." ON orders"..i.." (o_w_id,o_d_id,o_c_id,o_id)")
@@ -394,6 +390,17 @@ function create_tables(drv, con, table_num)
         con:query("ALTER TABLE stock"..i.." ADD CONSTRAINT fkey_stock_1_"..table_num.." FOREIGN KEY(s_w_id) REFERENCES warehouse"..i.."(w_id)")
         con:query("ALTER TABLE stock"..i.." ADD CONSTRAINT fkey_stock_2_"..table_num.." FOREIGN KEY(s_i_id) REFERENCES item"..i.."(i_id)")
     end
+   end
+
+   if (drv:name() == "mongodb") then
+	   print(string.format("Adding indexes %d ... \n", i))
+		con:query("{\"createIndexes\":\"customer\",\"indexes\":[{\"key\":{\"c_w_id\":1,\"c_d_id\":1,\"c_last\":1,\"c_first\":1}}]}")
+		con:query("{\"createIndexes\":\"orders\",\"indexes\":[{\"key\":{\"o_w_id\":1,\"o_d_id\":1,\"o_c_id\":1,\"o_id\":1}}]}")
+		con:query("{\"createIndexes\":\"stock\",\"indexes\":[{\"key\":{\"s_i_id\":1}}]}")
+		con:query("{\"createIndexes\":\"order_line\",\"indexes\":[{\"key\":{\"ol_supply_w_id\":1,\"ol_i_id\":1}}]}")
+		con:query("{\"createIndexes\":\"history\",\"indexes\":[{\"key\":{\"h_c_w_id\":1,\"h_c_d_id\":1,\"h_c_id\":1}}]}")
+		con:query("{\"createIndexes\":\"history\",\"indexes\":[{\"key\":{\"h_w_id\":1,\"h_d_id\":1}}]}")
+   end
 
 end
 
@@ -473,8 +480,8 @@ function load_tables(drv, con, warehouse_num)
     print(string.format("loading tables: %d for warehouse: %d\n", table_num, warehouse_num))
 
     con:bulk_insert_init([[{insert:warehouse%d,documents:[{w_id:%d, w_name:'%s', w_street_1:'%s', w_street_2:'%s', w_city:'%s',\
-	w_state:'%s', w_zip:'%s', w_tax:%f, w_ytd:300000}) }]}]]
-	 :format(table_num ,w_id, w_name, w_street_1, w_street_2, w_city, w_state, w_zip, w_tax, w_ytd) )
+	w_state:'%s', w_zip:'%s', w_tax:%f, w_ytd:300000}) }]}]])
+	 :format(table_num ,w_id, w_name, w_street_1, w_street_2, w_city, w_state, w_zip, w_tax, w_ytd)
 
     query = string.format([[(%d, '%s','%s','%s', '%s', '%s', '%s', %f,300000)]],
 	warehouse_num, sysbench.rand.string("name-@@@@@"), sysbench.rand.string("street1-@@@@@@@@@@"),
@@ -646,8 +653,9 @@ end
 function thread_init()
    drv = sysbench.sql.driver()
    con = drv:connect()
-   con:query("SET AUTOCOMMIT=0")-- mongo?
-
+   if (drv:name() ~= "mongodb") then
+		con:query("SET AUTOCOMMIT=0")-- mongo?
+   end
 end
 
 function thread_done()
@@ -661,7 +669,7 @@ function cleanup()
    if drv:name() == "mysql" then 
       con:query("SET FOREIGN_KEY_CHECKS=0")
    end
-
+   if (drv:name() ~= "mongodb") then
    for i = 1, sysbench.opt.tables do
       print(string.format("Dropping tables '%d'...", i))
       con:query("DROP TABLE IF EXISTS history" .. i )
@@ -673,6 +681,7 @@ function cleanup()
       con:query("DROP TABLE IF EXISTS stock" .. i )
       con:query("DROP TABLE IF EXISTS item" .. i )
       con:query("DROP TABLE IF EXISTS warehouse" .. i )
+   end
    end
 end
 

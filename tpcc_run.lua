@@ -96,7 +96,7 @@ function new_order()
   else
   -- mongo£ø∂‡±Ì≤È—Ø
 --	c_discount, c_last, c_credit, w_tax = con:query_row(([[db.customer%d.find]]):format(table_num, table_num, w_id, d_id, c_id)
-  ))
+  --))
 
   end
 --        SELECT d_next_o_id, d_tax INTO :d_next_o_id, :d_tax
@@ -114,8 +114,9 @@ function new_order()
                                            AND d_id = %d FOR UPDATE]]):
                                         format(table_num, w_id, d_id))
   else
-    d_next_o_id, d_tax = con:query_row(([[{find:district%d,filter:{d_w_id:%d,d_id:%d,upsert:true},projection:{d_next_o_id:1,d_tax:1}]]):
-                                        format(table_num, w_id, d_id))
+  	 local query = string.format("{\"find\":\"district%d\",\"filter\":{\"d_w_id\":%d,\"d_id\":%d,\"upsert\":1},\"projection\":{\"d_next_o_id\":1,\"d_tax\":1}"
+	 ,table_num, w_id, d_id)
+	  d_next_o_id, d_tax = con:query_row(query)
   end
 
 -- UPDATE district SET d_next_o_id = :d_next_o_id + 1
