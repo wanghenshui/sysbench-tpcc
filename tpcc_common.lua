@@ -394,12 +394,18 @@ function create_tables(drv, con, table_num)
 
    if (drv:name() == "mongodb") then
 	   print(string.format("Adding indexes %d ... \n", i))
-		con:query("{\"createIndexes\":\"customer\",\"indexes\":[{\"key\":{\"c_w_id\":1,\"c_d_id\":1,\"c_last\":1,\"c_first\":1}}]}")
-		con:query("{\"createIndexes\":\"orders\",\"indexes\":[{\"key\":{\"o_w_id\":1,\"o_d_id\":1,\"o_c_id\":1,\"o_id\":1}}]}")
-		con:query("{\"createIndexes\":\"stock\",\"indexes\":[{\"key\":{\"s_i_id\":1}}]}")
-		con:query("{\"createIndexes\":\"order_line\",\"indexes\":[{\"key\":{\"ol_supply_w_id\":1,\"ol_i_id\":1}}]}")
-		con:query("{\"createIndexes\":\"history\",\"indexes\":[{\"key\":{\"h_c_w_id\":1,\"h_c_d_id\":1,\"h_c_id\":1}}]}")
-		con:query("{\"createIndexes\":\"history\",\"indexes\":[{\"key\":{\"h_w_id\":1,\"h_d_id\":1}}]}")
+        con:query(string.format("{\"createIndexes\": \"customer%d\",\"indexes\": [{ \"key\": { \"c_w_id\": 1, \"c_d_id\": 1, \"c_last\": 1, \"c_first\": 1 },\"name\": \"idx_customer%d\"}]}",
+                              i, i))
+        con:query(string.format("{\"createIndexes\": \"orders%d\",\"indexes\": [{ \"key\": { \"o_w_id\": 1, \"o_d_id\": 1, \"o_c_id\": 1, \"o_id\": 1 },\"name\": \"idx_orders%d\"}]}",
+                              table_num, table_num))
+        con:query(string.format("{\"createIndexes\": \"stock%d\",\"indexes\": [{ \"key\": { \"s_i_id\": 1 },\"name\": \"fkey_stock_2%d\"}]}",
+                              table_num, table_num))
+        con:query(string.format("{\"createIndexes\": \"order_line%d\",\"indexes\": [{ \"key\": { \"ol_supply_w_id\": 1, \"ol_i_id\": 1 },\"name\": \"fkey_order_line_2%d\"}]}",
+                              table_num, table_num))
+        con:query(string.format("{\"createIndexes\": \"history%d\",\"indexes\": [{ \"key\": { \"h_c_w_id\": 1, \"h_c_d_id\": 1, \"h_c_id\": 1 },\"name\": \"fkey_history_1%d\"}]}",
+                              table_num, table_num))
+        con:query(string.format("{\"createIndexes\": \"history%d\",\"indexes\": [{ \"key\": { \"h_w_id\": 1, \"h_d_id\": 1},\"name\": \"fkey_history_2%d\"}]}",
+                              table_num, table_num))	
    end
 
 end
@@ -433,19 +439,7 @@ function set_isolation_level(drv,con)
        
         con:query("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL " .. isolation_level )
    end
-
-   if drv:name() == "mongodb"
-   then
-        if sysbench.opt.trx_level == "RR" then
-            isolation_level="REPEATABLE READ"
-        elseif sysbench.opt.trx_level == "RC" then
-            isolation_level="READ COMMITTED"
-        elseif sysbench.opt.trx_level == "SER" then
-            isolation_level="SERIALIZABLE"
-        end
-        -- FIXME: how?
-        --con:query("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL " .. isolation_level )
-   end
+   -- mongodb default isolation is SI
 end
 
 
@@ -653,15 +647,17 @@ end
 function thread_init()
    drv = sysbench.sql.driver()
    con = drv:connect()
-   if (drv:name() ~= "mongodb") then
-		con:query("SET AUTOCOMMIT=0")-- mongo?
+   if drv:name() ~= "mongodb"
+   then
+        con:query("SET AUTOCOMMIT=0")
    end
+
 end
 
 function thread_done()
    con:disconnect()
 end
--- mongo?
+
 function cleanup()
    local drv = sysbench.sql.driver()
    local con = drv:connect()
@@ -669,19 +665,34 @@ function cleanup()
    if drv:name() == "mysql" then 
       con:query("SET FOREIGN_KEY_CHECKS=0")
    end
-   if (drv:name() ~= "mongodb") then
+
    for i = 1, sysbench.opt.tables do
       print(string.format("Dropping tables '%d'...", i))
-      con:query("DROP TABLE IF EXISTS history" .. i )
-      con:query("DROP TABLE IF EXISTS new_orders" .. i )
-      con:query("DROP TABLE IF EXISTS order_line" .. i )
-      con:query("DROP TABLE IF EXISTS orders" .. i )
-      con:query("DROP TABLE IF EXISTS customer" .. i )
-      con:query("DROP TABLE IF EXISTS district" .. i )
-      con:query("DROP TABLE IF EXISTS stock" .. i )
-      con:query("DROP TABLE IF EXISTS item" .. i )
-      con:query("DROP TABLE IF EXISTS warehouse" .. i )
-   end
+      if drv:name() ~= "mongodb" then 
+      
+          con:query("DROP TABLE IF EXISTS history" .. i )
+          con:query("DROP TABLE IF EXISTS new_orders" .. i )
+          con:query("DROP TABLE IF EXISTS order_line" .. i )
+          con:query("DROP TABLE IF EXISTS orders" .. i )
+          con:query("DROP TABLE IF EXISTS customer" .. i )
+          con:query("DROP TABLE IF EXISTS district" .. i )
+          con:query("DROP TABLE IF EXISTS stock" .. i )
+          con:query("DROP TABLE IF EXISTS item" .. i )
+          con:query("DROP TABLE IF EXISTS warehouse" .. i )
+      
+      else
+          con:query(string.format("{\"drop\": \"history%d\" }", i))
+          con:query(string.format("{\"drop\": \"new_orders%d\" }", i))
+          con:query(string.format("{\"drop\": \"order_line%d\" }", i))
+          con:query(string.format("{\"drop\": \"orders%d\" }", i))
+          con:query(string.format("{\"drop\": \"customer%d\" }", i))
+          con:query(string.format("{\"drop\": \"district%d\" }", i))
+          con:query(string.format("{\"drop\": \"stock%d\" }", i))
+          con:query(string.format("{\"drop\": \"item%d\" }", i))
+          con:query(string.format("{\"drop\": \"warehouse%d\" }", i))
+      end
+      
+
    end
 end
 

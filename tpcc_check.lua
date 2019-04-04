@@ -21,7 +21,6 @@
 
 require("tpcc_common")
 
--- mongo? need reimpl with mongo js
 function check_tables(drv, con, warehouse_num)
 
     straight_join_hint=","
@@ -35,18 +34,18 @@ function check_tables(drv, con, warehouse_num)
     for table_num = 1, sysbench.opt.tables do 
         -- print(string.format("Checking  tables: %d for warehouse: %d\n", table_num, warehouse_num))
         if (drv:name() ~= "mongodb") then
-		rs  = con:query("SELECT d_w_id,sum(d_ytd)-max(w_ytd) diff FROM district"..table_num..",warehouse"..table_num.." WHERE d_w_id=w_id AND w_id="..warehouse_num.." group by d_w_id") 
-        else 
-
+			rs  = con:query("SELECT d_w_id,sum(d_ytd)-max(w_ytd) diff FROM district"..table_num..",warehouse"..table_num.." WHERE d_w_id=w_id AND w_id="..warehouse_num.." group by d_w_id") 
+			for i = 1, rs.nrows do
+				row = rs:fetch_row()
+				local d_tax = tonumber(row[2])
+				if d_tax ~= 0 then
+					pass1=0
+					print(string.format("Check 1, warehouse: %d, table %d FAILED!!!", warehouse_num, table_num))
+				end
+			end
+		else 
+		-- how?
 		end
-        for i = 1, rs.nrows do
-            row = rs:fetch_row()
-            local d_tax = tonumber(row[2])
-            if d_tax ~= 0 then
-                pass1=0
-                print(string.format("Check 1, warehouse: %d, table %d FAILED!!!", warehouse_num, table_num))
-            end
-        end
     end
     
     if pass1 ~= 1 then
